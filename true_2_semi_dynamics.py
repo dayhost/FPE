@@ -291,8 +291,8 @@ def main_func():
 
     # center = [1 / 8, 5 / 4]
     # center = [0, 0]
-    extent = [1100 * nm, 1100 * nm]
-    resolution = 11 * nm
+    extent = [950 * nm, 950 * nm]
+    resolution = 9.5 * nm
 
     init_pdf_center = (-100 * nm + center[0], -100 * nm + center[1])
     init_pdf_width = 30 * nm
@@ -316,10 +316,23 @@ def main_func():
     true_gradient_fpe = fokker_planck(temperature=temperature, drag=drag, extent=extent, center=center,
                 resolution=resolution, boundary=boundary_condition, force=true_gradient_force)
 
-    # 进行单个时刻的运算
-    true_gradient_init_pdf = gaussian_pdf(center=init_pdf_center, width=init_pdf_width)
-    # 计算True Gradient对应的Stationary Distribution
-    true_stationary_dist = true_gradient_fpe.propagate(true_gradient_init_pdf, time=propagation_time)
+    grid = true_gradient_fpe.grid
+    true_stationary_dist = np.zeros([len(grid[0]), len(grid[1])])
+    for i in range(len(grid[0][0])):
+        for j in range(len(grid[1][0])):
+            x = grid[0][i][j]
+            y = grid[1][i][j]
+
+            U1 = 1 / 2 * (phi_s1 * x - r_s1_a1 - gamma * phi_s2 * x) ** 2 + 1 / 2 * (
+                    phi_s3 * y - r_s1_a2 - gamma * phi_s4 * x) ** 2
+            U2 = 1 / 2 * (phi_s1 * x - r_s1_a1 - gamma * phi_s2 * y) ** 2 + 1 / 2 * (
+                    phi_s3 * y - r_s1_a2 - gamma * phi_s4 * y) ** 2
+
+            if x >= y:
+                true_stationary_dist[i][j] = np.exp(-U1 / wanted_diffusion_constant)
+            else:
+                true_stationary_dist[i][j] = np.exp(-U2 / wanted_diffusion_constant)
+
     true_stationary_dist_volume = np.trapz(
         np.trapz(true_stationary_dist, true_gradient_fpe.grid[0][:, 0], axis=0),
         true_gradient_fpe.grid[1][0, :], axis=0)
@@ -419,8 +432,8 @@ def main_func():
 
     ax.scatter([solution_theta1_a1], [solution_theta1_a2], s=200, marker="*", zorder=2, color="C0")
     ax.scatter([solution_theta2_a1], [solution_theta2_a2], s=200, marker="*", zorder=2, color="C1")
-    min_level = np.min(-np.log(semi_stationary_dist))
-    max_level = np.max(-np.log(semi_stationary_dist))
+    min_level = np.min(-np.log(true_stationary_dist))
+    max_level = np.max(-np.log(true_stationary_dist))
     contour = ax.contour(theta_a1_list, theta_a2_list, -np.log(true_stationary_dist), colors="gray",
                          levels=np.arange(min_level, max_level + step_level, step_level), zorder=1)
     # ax.clabel(contour, colors="k")
